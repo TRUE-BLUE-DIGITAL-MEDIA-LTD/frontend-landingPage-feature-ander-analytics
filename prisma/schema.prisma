@@ -121,6 +121,9 @@ model LandingPage {
   backgroundImage String?
   icon            String?
   language        String  @default("en")
+  primaryLanguage    String?  // copied from `language` by migration script
+  supportedLanguages String[] // empty for pre-migration; [primaryLanguage] after migration
+  translations       Json?    // { [lang]: { strings: { [key]: string }, title: string, description: string } }
 
   html String
   json String
