@@ -21,11 +21,13 @@ function Index({
   errorMessage,
   country,
   updatedHTML,
+  finalLanguage,
 }: {
   landingPage: ResponseGetLandingPageService;
   errorMessage?: string;
   country: string;
   updatedHTML: string;
+  finalLanguage: Language;
 }) {
   const router = useRouter();
   const mainLink = landingPage?.mainButton;
@@ -105,6 +107,12 @@ function Index({
   useEffect(() => {
     preventDefaultForSubmitButtons();
   }, []);
+
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      document.documentElement.lang = finalLanguage;
+    }
+  }, [finalLanguage]);
 
   const handleSumitEmail = async ({
     email,
@@ -218,6 +226,13 @@ function Index({
     );
   }
 
+  const primaryLang = (landingPage.primaryLanguage ?? landingPage.language) as Language;
+  const t =
+    landingPage.translations?.[finalLanguage] ??
+    landingPage.translations?.[primaryLang];
+  const pageTitle = t?.title || landingPage.title;
+  const pageDescription = t?.description || landingPage.description;
+
   return (
     <>
       {landingPage.domain.googleAnalyticsId && (
@@ -229,15 +244,15 @@ function Index({
       )}
 
       <Head>
-        <meta name="description" content={landingPage.description} />
+        <meta name="description" content={pageDescription} />
         {/* facebook sharing link */}
-        <meta property="og:title" content={landingPage.title} />
+        <meta property="og:title" content={pageTitle} />
         <meta
           property="og:site_name"
           content={landingPage.domain.name.split(".")[0]}
         />
         <meta property="og:type" content="website" />
-        <meta property="og:description" content={landingPage.description} />
+        <meta property="og:description" content={pageDescription} />
         <meta property="og:image" content={landingPage.backgroundImage} />
         <meta
           property="og:url"
@@ -245,13 +260,13 @@ function Index({
         />
 
         {/* tweeter sharing link */}
-        <meta name="twitter:title" content={landingPage.title} />
+        <meta name="twitter:title" content={pageTitle} />
         <meta name="twitter:type" content="website" />
-        <meta name="twitter:description" content={landingPage.description} />
+        <meta name="twitter:description" content={pageDescription} />
         <meta name="twitter:image" content={landingPage.backgroundImage} />
         <meta name="viewport" content="initial-scale=1.0, width=device-width" />
         <link rel="shortcut icon" href={landingPage.icon} />
-        <title>{landingPage.title}</title>
+        <title>{pageTitle}</title>
       </Head>
       <main dangerouslySetInnerHTML={{ __html: `${updatedHTML}` }} />
     </>
@@ -280,51 +295,62 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
     host = ctx.req.headers.host;
   }
   const acceptLanguage = ctx.req.headers["accept-language"];
-  console.log("acceptLanguage", acceptLanguage);
-  // 1. Default to 'en'
-  let userLanguage = "en";
-
-  if (acceptLanguage) {
-    // 2. Get the first preferred language (e.g., "en-US" or "en;q=0.9")
-    const firstLanguage = acceptLanguage.split(",")[0];
-
-    // 3. Split by ';' to remove quality weights (e.g., "en;q=0.9" -> ["en", "q=0.9"])
-    // 4. Split by '-' to get the base language (e.g., "en-US" -> ["en", "US"])
-    userLanguage = firstLanguage.split(";")[0].split("-")[0].toLowerCase();
-  }
-
-  // Ensure it matches your Language type/enum
-  const finalLanguage = userLanguage as Language;
-  console.log("finalLanguage", finalLanguage);
+  // Initial language guess from Accept-Language; refined below once we know
+  // which languages the matched lander actually supports.
+  const initialGuess = ((acceptLanguage ?? "en")
+    .split(",")[0]
+    ?.split(";")[0]
+    ?.split("-")[0]
+    ?.toLowerCase() || "en") as Language;
 
   try {
     const landingPage = await GetLandingPageService({
       domain: host,
-      language: finalLanguage,
+      language: initialGuess,
       prisma,
     });
+
+    const { pickLanguage } = await import("../server/render/pick-language");
+    const supported = (landingPage.supportedLanguages?.length
+      ? landingPage.supportedLanguages
+      : [landingPage.language]) as Language[];
+    const primary = (landingPage.primaryLanguage ?? landingPage.language) as Language;
+    const finalLanguage = pickLanguage(acceptLanguage, supported, primary);
+
     const dom = new JSDOM(landingPage.html);
-    let updatedHTML: string = landingPage.html;
+
+    // existing multiple-form script stripping (UNCHANGED)
     const scriptProductionMultipleForm = dom.window.document.querySelector(
       'script.script_multiple_form[src="https://oxyclick.com/unlayer-custom/script-multiple-form.js"]'
     );
+    if (scriptProductionMultipleForm && host.includes("localhost")) {
+      scriptProductionMultipleForm.remove();
+    }
     const scriptDevMultipleForm = dom.window.document.querySelector(
       'script.script_multiple_form[src="http://localhost:8080/unlayer-custom/script-multiple-form.js"]'
     );
-    if (scriptProductionMultipleForm && host.includes("localhost")) {
-      scriptProductionMultipleForm.remove();
-      updatedHTML = dom.serialize();
-    }
     if (scriptDevMultipleForm && !host.includes("localhost")) {
       scriptDevMultipleForm.remove();
-      updatedHTML = dom.serialize();
     }
+
+    // NEW: i18n substitution
+    const { applyI18nSubstitution } = await import("../server/render/substitute-i18n");
+    applyI18nSubstitution(
+      dom.window.document,
+      landingPage.translations ?? null,
+      finalLanguage,
+      primary,
+    );
+
+    // Serialize ONCE at the end
+    const updatedHTML: string = dom.serialize();
 
     return {
       props: {
         updatedHTML: updatedHTML ?? null,
         landingPage: landingPage ?? null,
         country,
+        finalLanguage,
       },
     };
   } catch (error) {

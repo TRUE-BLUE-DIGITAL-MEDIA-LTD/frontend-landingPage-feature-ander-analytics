@@ -8,6 +8,9 @@ export interface LandingPage {
   backgroundImage: string;
   icon: string | null;
   language: Language;
+  primaryLanguage?: string | null;
+  supportedLanguages?: string[];
+  translations?: Translations | null;
   html: string;
   json: string;
   viewCount: number | null;
