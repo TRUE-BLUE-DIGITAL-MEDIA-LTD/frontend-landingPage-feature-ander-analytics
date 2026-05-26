@@ -21,6 +21,7 @@ export interface LandingPage {
   domainId: string | null;
 }
 export type Language =
+  | "th"
   | "en"
   | "es"
   | "fr"
@@ -39,3 +40,11 @@ export type Language =
   | "hu"
   | "pl"
   | "cs";
+
+export interface LandingPageTranslation {
+  strings: Record<string, string>;
+  title: string;
+  description: string;
+}
+
+export type Translations = Partial<Record<Language, LandingPageTranslation>>;
