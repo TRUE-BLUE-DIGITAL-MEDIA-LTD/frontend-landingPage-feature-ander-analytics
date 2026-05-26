@@ -28,6 +28,9 @@ export async function GetLandingPageService(dto: {
       title: string;
       description: string;
       language: string;
+      primaryLanguage: string | null;
+      supportedLanguages: string[];
+      translations: any;
       backgroundImage: string;
       backOffer: string;
       secondOffer: string;
@@ -51,6 +54,9 @@ export async function GetLandingPageService(dto: {
         description: true,
         html: true,
         language: true,
+        primaryLanguage: true,
+        supportedLanguages: true,
+        translations: true,
         mainButton: true,
         title: true,
         percent: true,
@@ -68,9 +74,12 @@ export async function GetLandingPageService(dto: {
 
     landingPages = landingPages.filter((lp) => lp.percent > 0);
 
-    const checkLanguages = landingPages.filter(
-      (lp) => lp.language === dto.language
-    );
+    const checkLanguages = landingPages.filter((lp) => {
+      const supported = lp.supportedLanguages ?? [];
+      if (supported.length > 0) return supported.includes(dto.language);
+      // Pre-migration row with no supportedLanguages: keep the legacy match.
+      return lp.language === dto.language;
+    });
 
     if (checkLanguages.length !== 0) {
       landingPages = checkLanguages;
