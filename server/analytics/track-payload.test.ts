@@ -39,6 +39,23 @@ describe("parseTrackPayload", () => {
     assert.equal(p?.stepId?.length, 128);
     assert.equal(p?.label?.length, 256);
   });
+  it("returns null for non-finite numeric inputs and type mismatches", () => {
+    const p1 = parseTrackPayload({ sessionId: SID, type: "exit", timeOnPageMs: NaN, maxScrollPct: 50 });
+    assert.equal(p1?.timeOnPageMs, null);
+    assert.equal(p1?.maxScrollPct, 50);
+
+    const p2 = parseTrackPayload({ sessionId: SID, type: "exit", timeOnPageMs: Infinity, maxScrollPct: 75 });
+    assert.equal(p2?.timeOnPageMs, null);
+    assert.equal(p2?.maxScrollPct, 75);
+
+    const p3 = parseTrackPayload({ sessionId: SID, type: "exit", timeOnPageMs: 500, maxScrollPct: "50" });
+    assert.equal(p3?.timeOnPageMs, 500);
+    assert.equal(p3?.maxScrollPct, null);
+
+    const p4 = parseTrackPayload({ sessionId: SID, type: "exit" });
+    assert.equal(p4?.timeOnPageMs, null);
+    assert.equal(p4?.maxScrollPct, null);
+  });
 });
 
 describe("promoteExitType", () => {
