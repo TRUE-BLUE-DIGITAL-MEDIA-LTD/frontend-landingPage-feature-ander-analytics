@@ -22,12 +22,14 @@ function Index({
   country,
   updatedHTML,
   finalLanguage,
+  trackSessionId,
 }: {
   landingPage: ResponseGetLandingPageService;
   errorMessage?: string;
   country: string;
   updatedHTML: string;
   finalLanguage: Language;
+  trackSessionId: string | null;
 }) {
   const router = useRouter();
   const mainLink = landingPage?.mainButton;
@@ -415,36 +417,28 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
       landingPage.language) as Language;
     const finalLanguage = pickLanguage(acceptLanguage, supported, primary);
 
+    const { recordLanderView } = await import(
+      "../server/analytics/record-view"
+    );
+    const trackSessionId =
+      landingPage?.id && country !== "Thailand"
+        ? await recordLanderView({
+            prisma,
+            landingPageId: landingPage.id,
+            domainId: landingPage.domain?.id ?? null,
+            country,
+            userAgent: ctx.req.headers["user-agent"],
+            referrer: ctx.req.headers.referer,
+            query: ctx.query,
+          })
+        : null;
+
     const dom = new JSDOM(landingPage.html);
 
-    // existing multiple-form script stripping (UNCHANGED)
-    const scriptProductionMultipleForm = dom.window.document.querySelector(
-      'script.script_multiple_form[src="https://oxyclick.com/unlayer-custom/script-multiple-form.js"]',
+    const { stripParityScripts } = await import(
+      "../server/render/strip-parity-scripts"
     );
-    if (scriptProductionMultipleForm && host.includes("localhost")) {
-      scriptProductionMultipleForm.remove();
-    }
-    const scriptDevMultipleForm = dom.window.document.querySelector(
-      'script.script_multiple_form[src="http://localhost:8080/unlayer-custom/script-multiple-form.js"]',
-    );
-    if (scriptDevMultipleForm && !host.includes("localhost")) {
-      scriptDevMultipleForm.remove();
-    }
-
-    // quiz runtime script stripping — same dev/prod parity treatment as
-    // multiple-form above.
-    const scriptProductionQuiz = dom.window.document.querySelector(
-      'script[src="https://oxyclick.com/unlayer-custom/script-quiz.js"]',
-    );
-    if (scriptProductionQuiz && host.includes("localhost")) {
-      scriptProductionQuiz.remove();
-    }
-    const scriptDevQuiz = dom.window.document.querySelector(
-      'script[src="http://localhost:8080/unlayer-custom/script-quiz.js"]',
-    );
-    if (scriptDevQuiz && !host.includes("localhost")) {
-      scriptDevQuiz.remove();
-    }
+    stripParityScripts(dom.window.document, host);
 
     // NEW: i18n substitution
     const { applyI18nSubstitution } =
@@ -465,6 +459,7 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
         landingPage: landingPage ?? null,
         country,
         finalLanguage,
+        trackSessionId: trackSessionId ?? null,
       },
     };
   } catch (error) {
