@@ -29,6 +29,8 @@ export function initLanderTracking(opts: {
         keepalive: true,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionId, ...payload }),
+      }).catch(() => {
+        /* tracking must never break the lander */
       });
     } catch {
       /* tracking must never break the lander */
@@ -79,7 +81,9 @@ export function initLanderTracking(opts: {
   };
 
   try {
-    window.history.pushState({ oxyTrack: true }, "", window.location.href);
+    if ((window.history.state as { oxyTrack?: boolean } | null)?.oxyTrack !== true) {
+      window.history.pushState({ oxyTrack: true }, "", window.location.href);
+    }
     trapArmed = true;
   } catch {
     /* history API unavailable — back detection degrades to "closed" */
@@ -100,6 +104,7 @@ export function initLanderTracking(opts: {
       post({ type: "step", stepId, label: label ?? null });
     },
     destroy() {
+      trapArmed = false;
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("pagehide", onPageHide);
       document.removeEventListener("visibilitychange", onVisibility);
