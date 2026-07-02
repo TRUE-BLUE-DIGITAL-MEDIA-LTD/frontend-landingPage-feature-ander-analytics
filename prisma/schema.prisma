@@ -510,6 +510,8 @@ model LanderSession {
   steps Json?
 
   @@index([landingPageId, createAt])
+  @@index([createAt])
+  @@index([domainId, createAt])
   @@map(name: "landerSessions")
 }
 
