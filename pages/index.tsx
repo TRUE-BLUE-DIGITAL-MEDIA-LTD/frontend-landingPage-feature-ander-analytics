@@ -11,10 +11,11 @@ import { GetServerSideProps } from "next";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import { event, GoogleAnalytics } from "nextjs-google-analytics";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import requestIp from "request-ip";
 import Swal from "sweetalert2";
 import { Language } from "../interfaces";
+import { initLanderTracking, LanderTracker } from "@/services/tracking";
 
 function Index({
   landingPage,
@@ -56,6 +57,7 @@ function Index({
             category: "multiple-form-step",
             label: text,
           });
+          trackerRef.current?.trackStep(classId[0], text);
           e.preventDefault();
         });
       });
@@ -73,6 +75,7 @@ function Index({
           category: "button-click",
           label: href,
         });
+        trackerRef.current?.trackClick(href);
         router.push(href);
         e.preventDefault();
       });
@@ -110,6 +113,18 @@ function Index({
     preventDefaultForSubmitButtons();
   }, []);
 
+  const trackerRef = useRef<LanderTracker | null>(null);
+  useEffect(() => {
+    if (!trackSessionId || !landingPage?.id) return;
+    const tracker = initLanderTracking({ sessionId: trackSessionId });
+    trackerRef.current = tracker;
+    return () => {
+      tracker.destroy();
+      trackerRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     // Quiz runtime contract — see clients/dashboard/public/unlayer-custom/
     // script-quiz.ts. "oxy-quiz:complete" is cancelable: preventDefault()
@@ -122,6 +137,7 @@ function Index({
         category: "quiz-step",
         label: d?.label ?? d?.value ?? "",
       });
+      trackerRef.current?.trackStep(d?.stepId ?? "quiz_step", d?.label ?? d?.value ?? null);
     };
     const onQuizComplete = (e: Event) => {
       e.preventDefault();
@@ -155,6 +171,7 @@ function Index({
         category: "button-click",
         label: mainLink,
       });
+      trackerRef.current?.trackClick(mainLink);
       Swal.fire({
         title: "Thanks For Joining us",
         html: "Loading....",
@@ -240,6 +257,7 @@ function Index({
     const base = redirectUrl && redirectUrl !== "" ? redirectUrl : mainLink;
     try {
       event("click", { category: "quiz-complete", label: base });
+      trackerRef.current?.trackClick(base);
       Swal.fire({
         title: "Finding your matches",
         html: "Loading....",
