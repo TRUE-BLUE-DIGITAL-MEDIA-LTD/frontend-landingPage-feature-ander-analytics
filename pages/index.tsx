@@ -36,14 +36,14 @@ function Index({
     const submitButtons = document.querySelectorAll('button[type="submit"]');
 
     const emailInput: HTMLInputElement = document.querySelector(
-      'input[type="email"][name="email"]'
+      'input[type="email"][name="email"]',
     );
 
     const buttons = document.querySelectorAll("button");
     const multipleFormButtons = Array.from(buttons).filter((button) =>
       Array.from(button.classList).some((className) =>
-        className.includes("form")
-      )
+        className.includes("form"),
+      ),
     );
     if (multipleFormButtons.length > 0) {
       multipleFormButtons.forEach((button) => {
@@ -106,6 +106,35 @@ function Index({
 
   useEffect(() => {
     preventDefaultForSubmitButtons();
+  }, []);
+
+  useEffect(() => {
+    // Quiz runtime contract — see clients/dashboard/public/unlayer-custom/
+    // script-quiz.ts. "oxy-quiz:complete" is cancelable: preventDefault()
+    // claims it, otherwise the runtime falls back to its own redirect.
+    const onQuizStep = (e: Event) => {
+      const d = (e as CustomEvent).detail as
+        | { stepId?: string; value?: string; label?: string }
+        | undefined;
+      event(d?.stepId ?? "quiz_step", {
+        category: "quiz-step",
+        label: d?.label ?? d?.value ?? "",
+      });
+    };
+    const onQuizComplete = (e: Event) => {
+      e.preventDefault();
+      const d = (e as CustomEvent).detail as
+        | { answers?: Record<string, string>; email?: string; redirectUrl?: string; appendAnswers?: boolean }
+        | undefined;
+      void handleQuizComplete(d ?? {});
+    };
+    document.addEventListener("oxy-quiz:step", onQuizStep);
+    document.addEventListener("oxy-quiz:complete", onQuizComplete);
+    return () => {
+      document.removeEventListener("oxy-quiz:step", onQuizStep);
+      document.removeEventListener("oxy-quiz:complete", onQuizComplete);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -172,9 +201,74 @@ function Index({
         }
       }
     } catch (err) {
-      window.open(mainLink), "_self";
+      (window.open(mainLink), "_self");
     }
   };
+  const appendQuizParams = (
+    url: string,
+    answers?: Record<string, string>,
+    email?: string,
+    appendAnswers = true,
+  ) => {
+    try {
+      const u = new URL(url);
+      if (appendAnswers) {
+        Object.entries(answers ?? {}).forEach(([key, value]) =>
+          u.searchParams.set(key, value),
+        );
+      }
+      if (email) u.searchParams.set("sub3", btoa(email));
+      return u.toString();
+    } catch {
+      return url;
+    }
+  };
+
+  const handleQuizComplete = async ({
+    answers,
+    email,
+    redirectUrl,
+    appendAnswers,
+  }: {
+    answers?: Record<string, string>;
+    email?: string;
+    redirectUrl?: string;
+    appendAnswers?: boolean;
+  }) => {
+    const base = redirectUrl && redirectUrl !== "" ? redirectUrl : mainLink;
+    try {
+      event("click", { category: "quiz-complete", label: base });
+      Swal.fire({
+        title: "Finding your matches",
+        html: "Loading....",
+        allowEscapeKey: false,
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        },
+      });
+      if (email) {
+        await CreateEmailService({
+          email,
+          landingPageId: landingPage?.id,
+        }).catch(() => undefined);
+      }
+      if (landingPage.directLink) {
+        const direct = await DirectLinkService({
+          email,
+          url: landingPage.directLink,
+        }).catch(() => null);
+        if (direct?.status === "success") {
+          router.push(direct.location);
+          return;
+        }
+      }
+      window.open(appendQuizParams(base, answers, email, appendAnswers !== false), "_self");
+    } catch (err) {
+      window.open(base, "_self");
+    }
+  };
+
   if (errorMessage) {
     return (
       <div className="w-screen h-screen bg-black font-Anuphan">
@@ -226,7 +320,8 @@ function Index({
     );
   }
 
-  const primaryLang = (landingPage.primaryLanguage ?? landingPage.language) as Language;
+  const primaryLang = (landingPage.primaryLanguage ??
+    landingPage.language) as Language;
   const t =
     landingPage.translations?.[finalLanguage] ??
     landingPage.translations?.[primaryLang];
@@ -311,30 +406,49 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
     });
 
     const { pickLanguage } = await import("../server/render/pick-language");
-    const supported = (landingPage.supportedLanguages?.length
-      ? landingPage.supportedLanguages
-      : [landingPage.language]) as Language[];
-    const primary = (landingPage.primaryLanguage ?? landingPage.language) as Language;
+    const supported = (
+      landingPage.supportedLanguages?.length
+        ? landingPage.supportedLanguages
+        : [landingPage.language]
+    ) as Language[];
+    const primary = (landingPage.primaryLanguage ??
+      landingPage.language) as Language;
     const finalLanguage = pickLanguage(acceptLanguage, supported, primary);
 
     const dom = new JSDOM(landingPage.html);
 
     // existing multiple-form script stripping (UNCHANGED)
     const scriptProductionMultipleForm = dom.window.document.querySelector(
-      'script.script_multiple_form[src="https://oxyclick.com/unlayer-custom/script-multiple-form.js"]'
+      'script.script_multiple_form[src="https://oxyclick.com/unlayer-custom/script-multiple-form.js"]',
     );
     if (scriptProductionMultipleForm && host.includes("localhost")) {
       scriptProductionMultipleForm.remove();
     }
     const scriptDevMultipleForm = dom.window.document.querySelector(
-      'script.script_multiple_form[src="http://localhost:8080/unlayer-custom/script-multiple-form.js"]'
+      'script.script_multiple_form[src="http://localhost:8080/unlayer-custom/script-multiple-form.js"]',
     );
     if (scriptDevMultipleForm && !host.includes("localhost")) {
       scriptDevMultipleForm.remove();
     }
 
+    // quiz runtime script stripping — same dev/prod parity treatment as
+    // multiple-form above.
+    const scriptProductionQuiz = dom.window.document.querySelector(
+      'script[src="https://oxyclick.com/unlayer-custom/script-quiz.js"]',
+    );
+    if (scriptProductionQuiz && host.includes("localhost")) {
+      scriptProductionQuiz.remove();
+    }
+    const scriptDevQuiz = dom.window.document.querySelector(
+      'script[src="http://localhost:8080/unlayer-custom/script-quiz.js"]',
+    );
+    if (scriptDevQuiz && !host.includes("localhost")) {
+      scriptDevQuiz.remove();
+    }
+
     // NEW: i18n substitution
-    const { applyI18nSubstitution } = await import("../server/render/substitute-i18n");
+    const { applyI18nSubstitution } =
+      await import("../server/render/substitute-i18n");
     applyI18nSubstitution(
       dom.window.document,
       landingPage.translations ?? null,
