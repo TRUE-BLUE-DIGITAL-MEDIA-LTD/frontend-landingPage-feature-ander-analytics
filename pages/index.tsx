@@ -57,10 +57,10 @@ function Index({
             category: "multiple-form-step",
             label: text,
           });
-          trackerRef.current?.trackStep(classId[0], text);
-          // Runtime redirects to the offer on the last form_step's button — the conversion.
           const formSteps = document.getElementsByClassName("form_step");
           const ownStep = button.closest(".form_step");
+          trackerRef.current?.trackStep(ownStep?.id || classId[0], text);
+          // Runtime redirects to the offer on the last form_step's button — the conversion.
           if (formSteps.length > 0 && ownStep === formSteps[formSteps.length - 1]) {
             let url: string | undefined;
             try { url = (JSON.parse(button.getAttribute("value") ?? "{}") as { url?: string }).url; } catch { /* value attr is runtime-owned; absence is fine */ }
