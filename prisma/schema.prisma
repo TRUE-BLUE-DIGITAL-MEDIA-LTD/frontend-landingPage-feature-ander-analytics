@@ -159,7 +159,6 @@ model Domain {
 
   name              String  @unique
   googleAnalyticsId String?
-  oxyeyeAnalyticsId String?
 
   note String
 
