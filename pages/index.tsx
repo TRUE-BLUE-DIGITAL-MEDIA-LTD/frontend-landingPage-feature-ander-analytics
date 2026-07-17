@@ -448,6 +448,24 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
       landingPage.language) as Language;
     const finalLanguage = pickLanguage(acceptLanguage, supported, primary);
 
+    const { resolveVisitor, buildVisitorCookie, VISITOR_COOKIE } = await import(
+      "../server/analytics/visitor-cookie"
+    );
+    const visitor = resolveVisitor(ctx.req.cookies?.[VISITOR_COOKIE]);
+    if (!visitor.isReturning) {
+      try {
+        ctx.res.setHeader(
+          "Set-Cookie",
+          buildVisitorCookie(
+            visitor.visitorId,
+            process.env.NEXT_PUBLIC_NODE_ENV !== "development",
+          ),
+        );
+      } catch {
+        /* cookie failure must not break the lander */
+      }
+    }
+
     const { recordLanderView } = await import(
       "../server/analytics/record-view"
     );
@@ -461,6 +479,8 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
             userAgent: ctx.req.headers["user-agent"],
             referrer: ctx.req.headers.referer,
             query: ctx.query,
+            visitorId: visitor.visitorId,
+            isReturning: visitor.isReturning,
           })
         : null;
 
