@@ -16,6 +16,7 @@ import requestIp from "request-ip";
 import Swal from "sweetalert2";
 import { Language } from "../interfaces";
 import { initLanderTracking, LanderTracker } from "@/services/tracking";
+import { isMainTarget } from "@/services/main-target";
 
 function Index({
   landingPage,
@@ -83,7 +84,11 @@ function Index({
           category: "button-click",
           label: href,
         });
-        trackerRef.current?.trackClick(href);
+        if (isMainTarget(href, mainLink)) {
+          trackerRef.current?.trackClick(href);
+        } else {
+          trackerRef.current?.trackLink(href);
+        }
         router.push(href);
         e.preventDefault();
       });
