@@ -29,6 +29,8 @@ describe("recordLanderView", () => {
       userAgent: REAL_UA,
       referrer: "https://t.co/xyz",
       query: { utm_source: "tw" },
+      visitorId: "123e4567-e89b-42d3-a456-426614174000",
+      isReturning: true,
     });
     assert.match(
       sessionId as string,
@@ -40,6 +42,8 @@ describe("recordLanderView", () => {
     assert.equal(data.device, "desktop");
     assert.equal(data.utmSource, "tw");
     assert.equal(data.referrer, "https://t.co/xyz");
+    assert.equal(data.visitorId, "123e4567-e89b-42d3-a456-426614174000");
+    assert.equal(data.isReturning, true);
   });
 
   it("returns null for bots and does not write", async () => {
@@ -52,6 +56,8 @@ describe("recordLanderView", () => {
       userAgent: "Googlebot/2.1",
       referrer: undefined,
       query: {},
+      visitorId: "123e4567-e89b-42d3-a456-426614174000",
+      isReturning: false,
     });
     assert.equal(sessionId, null);
     assert.equal(prisma.calls.length, 0);
@@ -73,6 +79,8 @@ describe("recordLanderView", () => {
       userAgent: REAL_UA,
       referrer: undefined,
       query: {},
+      visitorId: null,
+      isReturning: false,
     });
     assert.equal(sessionId, null);
   });

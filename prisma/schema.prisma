@@ -498,6 +498,8 @@ model LanderSession {
   utmSource   String?
   utmMedium   String?
   utmCampaign String?
+  visitorId   String?
+  isReturning Boolean @default(false)
 
   clickedMain  Boolean        @default(false)
   clickedAt    DateTime?

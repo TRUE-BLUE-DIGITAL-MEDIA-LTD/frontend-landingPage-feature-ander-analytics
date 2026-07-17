@@ -10,6 +10,8 @@ export async function recordLanderView(dto: {
   userAgent: string | undefined;
   referrer: string | undefined;
   query: Record<string, unknown>;
+  visitorId: string | null;
+  isReturning: boolean;
 }): Promise<string | null> {
   try {
     if (isBotUserAgent(dto.userAgent)) return null;
@@ -26,6 +28,8 @@ export async function recordLanderView(dto: {
         utmSource: utm.utmSource,
         utmMedium: utm.utmMedium,
         utmCampaign: utm.utmCampaign,
+        visitorId: dto.visitorId,
+        isReturning: dto.isReturning,
       },
     });
     return sessionId;
