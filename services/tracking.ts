@@ -2,12 +2,14 @@ import { computeScrollPct, createExitState } from "./tracking-core";
 
 export interface LanderTracker {
   trackClick(target: string): void;
+  trackLink(target: string): void;
   trackStep(stepId: string, label?: string | null): void;
   destroy(): void;
 }
 
 const noop: LanderTracker = {
   trackClick() {},
+  trackLink() {},
   trackStep() {},
   destroy() {},
 };
@@ -99,6 +101,9 @@ export function initLanderTracking(opts: {
     trackClick(target: string) {
       exit.markClick();
       post({ type: "click", clickTarget: target });
+    },
+    trackLink(target: string) {
+      post({ type: "link", clickTarget: target });
     },
     trackStep(stepId: string, label?: string | null) {
       post({ type: "step", stepId, label: label ?? null });

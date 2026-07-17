@@ -76,4 +76,27 @@ describe("applyTrackEvent", () => {
     await applyTrackEvent(prisma, payload({ type: "click" }));
     assert.equal(prisma.updates.length, 0);
   });
+
+  it("link appends a steps entry and never sets clickedMain", async () => {
+    const prisma = fakePrisma({ id: "1", exitType: "unknown", steps: null });
+    await applyTrackEvent(
+      prisma,
+      payload({ type: "link", clickTarget: "https://x.com/privacy" }),
+    );
+    assert.equal(prisma.updates.length, 1);
+    const data = prisma.updates[0].data;
+    assert.equal(data.clickedMain, undefined);
+    assert.equal(data.exitType, undefined);
+    assert.equal(data.steps.length, 1);
+    assert.equal(data.steps[0].stepId, "link");
+    assert.equal(data.steps[0].label, "https://x.com/privacy");
+    assert.equal(typeof data.steps[0].at, "string");
+  });
+
+  it("link respects the 50-step cap", async () => {
+    const existing = Array.from({ length: 50 }, (_, i) => ({ stepId: `s${i}` }));
+    const prisma = fakePrisma({ id: "1", exitType: "unknown", steps: existing });
+    await applyTrackEvent(prisma, payload({ type: "link", clickTarget: "https://x.com" }));
+    assert.equal(prisma.updates.length, 0);
+  });
 });

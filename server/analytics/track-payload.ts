@@ -4,7 +4,7 @@ export type ExitType = "clicked_through" | "back" | "closed" | "unknown";
 
 export interface TrackPayload {
   sessionId: string;
-  type: "click" | "step" | "exit";
+  type: "click" | "step" | "exit" | "link";
   clickTarget: string | null;
   stepId: string | null;
   label: string | null;
@@ -15,7 +15,7 @@ export interface TrackPayload {
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const TYPES = new Set(["click", "step", "exit"]);
+const TYPES = new Set(["click", "step", "exit", "link"]);
 // The wire never carries clicked_through — that is only set server-side on a
 // click event. Anything unexpected collapses to "unknown".
 const WIRE_EXITS = new Set(["back", "closed", "unknown"]);

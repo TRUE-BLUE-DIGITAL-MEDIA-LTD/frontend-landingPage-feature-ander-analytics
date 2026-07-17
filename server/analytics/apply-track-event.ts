@@ -44,6 +44,27 @@ export async function applyTrackEvent(
     return;
   }
 
+  if (payload.type === "link") {
+    // Non-offer link click: kept as a step for visibility, but it must not
+    // count as a main click or suppress bounce.
+    const steps = Array.isArray(session.steps) ? (session.steps as any[]) : [];
+    if (steps.length >= MAX_STEPS) return;
+    await prisma.landerSession.update({
+      where: { id: session.id },
+      data: {
+        steps: [
+          ...steps,
+          {
+            stepId: "link",
+            label: payload.clickTarget,
+            at: new Date().toISOString(),
+          },
+        ],
+      },
+    });
+    return;
+  }
+
   // step
   const steps = Array.isArray(session.steps) ? (session.steps as any[]) : [];
   if (steps.length >= MAX_STEPS) return;

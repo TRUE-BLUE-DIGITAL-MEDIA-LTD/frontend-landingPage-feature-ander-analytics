@@ -58,6 +58,18 @@ describe("parseTrackPayload", () => {
   });
 });
 
+describe("link payloads", () => {
+  it("accepts type link with the URL in clickTarget", () => {
+    const p = parseTrackPayload({
+      sessionId: "123e4567-e89b-42d3-a456-426614174000",
+      type: "link",
+      clickTarget: "https://x.com/privacy",
+    });
+    assert.equal(p?.type, "link");
+    assert.equal(p?.clickTarget, "https://x.com/privacy");
+  });
+});
+
 describe("promoteExitType", () => {
   it("never downgrades", () => {
     assert.equal(promoteExitType("clicked_through", "closed"), "clicked_through");
